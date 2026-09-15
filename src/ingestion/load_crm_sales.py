@@ -5,7 +5,7 @@ from src.database import get_connection
 SOURCE_FILE = Path("dataset/source_crm/sales_details.csv")
 
 def load_crm_sales():
-    batch_id = str(uuid4())
+    batch_id = uuid4()
 
     if not SOURCE_FILE.exists():
         raise FileNotFoundError(f" source file {SOURCE_FILE} not found")
