@@ -28,7 +28,7 @@ def calculate_file_hash(filepath):
 #====================================
 
 def already_ingested(file_hash):
-    with get_connection as conn:
+    with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 select 1
@@ -44,7 +44,7 @@ def already_ingested(file_hash):
 # Log STARTED
 #====================================
 def log_started(batch_id, file_hash):
-    with get_connection as conn:
+    with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO bronze.ingestion_log(
@@ -62,13 +62,13 @@ def log_started(batch_id, file_hash):
 # Log SUCCESS
 #====================================
 def log_success(batch_id, rows_loaded):
-    with get_connection as conn:
+    with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE bronze.ingestion_log
-                SET completed_at = NOW() AND
-                status = 'SUCCESS' AND 
-                rows_loaded = %s AND
+                SET completed_at = NOW(),
+                status = 'SUCCESS',
+                rows_loaded = %s,
                 error_message = NULL
                 WHERE batch_id = %s 
             """,(rows_loaded,batch_id)
@@ -80,7 +80,7 @@ def log_success(batch_id, rows_loaded):
 #====================================
 
 def log_failed(batch_id,error_message):
-    with get_connection as conn:
+    with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE bronze.ingestion_log
@@ -153,6 +153,8 @@ def load_bronze(batch_id):
                         f"Row-count mismatch: "
                         f"temp={rows_loaded}, bronze={bronze_rows}"
                     )
+
+            log_success(batch_id,bronze_rows)
             return rows_loaded
    
 #===================================
@@ -171,6 +173,7 @@ def load_crm_customers():
     # Idenotency Check
       if already_ingested(file_hash):
         print(f"{SOURCE_FILE.name} has already been successfully ingested. Skipping...")
+        return
 
     # Creating unique ID for this ingestion attempt
       batch_id = uuid4()
@@ -186,7 +189,6 @@ def load_crm_customers():
         raise
 
       else:
-        log_success(batch_id, rows_loaded)
         print(f"successfully loaded into table")
 
 
