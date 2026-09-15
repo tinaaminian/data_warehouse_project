@@ -59,23 +59,6 @@ def log_started(batch_id, file_hash):
 
 
 #===================================
-# Log SUCCESS
-#====================================
-def log_success(batch_id, rows_loaded):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE bronze.ingestion_log
-                SET completed_at = NOW(),
-                status = 'SUCCESS',
-                rows_loaded = %s,
-                error_message = NULL
-                WHERE batch_id = %s 
-            """,(rows_loaded,batch_id)
-            )
-
-
-#===================================
 # Log FAILED
 #====================================
 
@@ -84,8 +67,9 @@ def log_failed(batch_id,error_message):
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE bronze.ingestion_log
-                SET error_message = %s AND
-                status = 'FAILED'
+                SET error_message = %s,
+                status = 'FAILED',
+                completed_at = NOW()
                 WHERE batch_id = %s
             """,(str(error_message),batch_id)
             )
@@ -154,7 +138,15 @@ def load_bronze(batch_id):
                         f"temp={rows_loaded}, bronze={bronze_rows}"
                     )
 
-            log_success(batch_id,bronze_rows)
+            cur.execute("""
+                UPDATE bronze.ingestion_log
+                SET completed_at = NOW(),
+                status = 'SUCCESS',
+                rows_loaded = %s,
+                error_message = NULL
+                WHERE batch_id = %s 
+            """,(rows_loaded,batch_id)
+            )
             return rows_loaded
    
 #===================================
