@@ -64,7 +64,7 @@ def load_bronze(batch_id):
 
             return bronze_erp_loc_rows
 
-def load_erp_customers():
+def load_erp_loc():
 
     # Check file exists or not
     if not SOURCE_FILE.exists():
@@ -100,4 +100,4 @@ def load_erp_customers():
 
 
 if __name__ == "__main__":
-    load_erp_customers()
+    load_erp_loc()
