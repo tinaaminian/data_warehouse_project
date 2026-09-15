@@ -1,79 +1,14 @@
 from pathlib import Path
 from uuid import uuid4
-import hashlib
 from src.database import get_connection
-
+from src.ingestion.ingestion_utils import (calculate_file_hash,
+already_ingested,log_started,log_failed)
 #===================================
 # getting source file
 #====================================
 
 SOURCE_FILE = Path("dataset/source_crm/cust_info.csv")
 SOURCE_SYSTEM = "CRM"
-
-#===================================
-# Calculating SHA-256 hash for file content to prevent duplicate loading
-#====================================
-
-def calculate_file_hash(filepath):
-    sha256 = hashlib.sha256()
-
-    with filepath.open('rb') as f:
-        while chunk := f.read(8192):
-            sha256.update(chunk)
-    return sha256.hexdigest()
-
-
-#===================================
-# Checking whether this exact file was already loaded successfully or not
-#====================================
-
-def already_ingested(file_hash):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                select 1
-                from bronze.ingestion_log
-                where source_system = %s AND
-                file_hash = %s AND
-                status = 'SUCCESS'
-            """, (SOURCE_SYSTEM,file_hash))
-
-            return cur.fetchone()
-
-#===================================
-# Log STARTED
-#====================================
-def log_started(batch_id, file_hash):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO bronze.ingestion_log(
-                    batch_id,
-                    source_system,
-                    source_file,
-                    file_hash,
-                    status
-                )
-                VALUES(%s,%s,%s,%s,'STARTED')
-            """,(batch_id,SOURCE_SYSTEM,SOURCE_FILE.name,file_hash))
-
-
-#===================================
-# Log FAILED
-#====================================
-
-def log_failed(batch_id,error_message):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE bronze.ingestion_log
-                SET error_message = %s,
-                status = 'FAILED',
-                completed_at = NOW()
-                WHERE batch_id = %s
-            """,(str(error_message),batch_id)
-            )
-
 
 #===================================
 # loading source content to database corresponding table using log table
@@ -163,7 +98,7 @@ def load_crm_customers():
       file_hash = calculate_file_hash(SOURCE_FILE)
 
     # Idenotency Check
-      if already_ingested(file_hash):
+      if already_ingested(SOURCE_SYSTEM,file_hash):
         print(f"{SOURCE_FILE.name} has already been successfully ingested. Skipping...")
         return
 
@@ -171,7 +106,7 @@ def load_crm_customers():
       batch_id = uuid4()
 
       # Recird STARTED and commit it independently
-      log_started(batch_id, file_hash)
+      log_started(batch_id,SOURCE_SYSTEM,SOURCE_FILE.name,file_hash)
 
       try:
         rows_loaded = load_bronze(batch_id)
