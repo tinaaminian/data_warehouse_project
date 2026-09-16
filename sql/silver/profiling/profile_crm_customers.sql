@@ -44,6 +44,24 @@ select count(*), cst_marital_status
 from bronze.crm_cust_info 
 group by cst_marital_status 
 
+-- Chekcing cst_key
+select cst_key
+from bronze.crm_cust_info cci 
+where cst_key is null 
+
+select count(distinct cst_key), count(cst_key)
+from bronze.crm_cust_info 
+
+select count(*), cst_key
+from bronze.crm_cust_info
+where cst_key is not null
+group by cst_key
+having count(*)>1
+
+select count(*)
+from bronze.crm_cust_info cci 
+where cst_key != trim(cci.cst_key)
+
 -- ==========================Date=======================
 -- Profiling date 1- checking for NULL
 select count(*)
