@@ -72,3 +72,23 @@ select trim(cntry), count(*)
 from bronze.erp_loc_a101
 where cntry is not null 
 group by trim(cntry) 
+
+---------------------------------checking nd validating erp_loc ids----------------------
+with erp_loc_transformed_cid as (
+	select cid, replace(trim(cid), '-','') as transformed_cid
+	from bronze.erp_loc_a101 ela  
+)
+select count(*), 
+count(*) filter (where length(trim(transformed_cid)) != 10 ) as invalid_length,
+count(*) filter (where transformed_cid !~ '^AW[0-9]{8}$') as invalid_format
+from erp_loc_transformed_cid
+
+-----Checking for duplicates-------------
+select count(*) , transformed_cid 
+from (
+	select cid, replace(trim(cid), '-','') as transformed_cid
+	from bronze.erp_loc_a101 ela  
+)
+group by transformed_cid
+having count(*) > 1
+

@@ -1,3 +1,22 @@
+-- ============================================================================
+-- PROFILING FINDINGS
+-- ============================================================================
+
+/*
+Customer Key Findings
+---------------------
+- Total rows: 18,494
+- 18,490 cst_key values follow the dominant 10-character pattern beginning AW0.
+- 4 records have different key structures:
+    SF566
+    PO25
+    13451235
+    A01Ass
+- These four records appear to have missing customer attributes.
+- Their meaning must be investigated before defining the Silver
+  customer-key validation rule.
+*/
+
 -- Checking whether there is null or duplicates using COUNT()
 select count(*) as total_rows,
 count(cst_id) as not_null_ids,
@@ -85,3 +104,39 @@ select cst_create_date, cst_create_date::DATE as converted_date
 from bronze.crm_cust_info 
 where cst_create_date is not null and 
 trim(cst_create_date) != ''
+
+-- length------------------------------------------------
+select count(*),length(trim(cst_key)) as character_count
+from bronze.crm_cust_info
+where cst_key is not null 
+group by length(trim(cst_key))
+
+select * 
+from bronze.crm_cust_info
+where cst_key is not null and length(trim(cst_key)) != 10
+
+select count(*), length(trim(cid))
+from bronze.erp_cust_az12
+where cid is not null 
+group by length(trim(cid))
+
+select count(*) , length(trim(cid))
+from bronze.erp_loc_a101 ela 
+where cid is not null  
+group by length(trim(cid))
+
+----prefix-------------------------------------------
+select count(*), left(trim(cid),3) as prefix_chars
+from bronze.erp_loc_a101 ela 
+where cid is not null 
+group by left(trim(cid),3)
+
+select count(*), left(trim(cci.cst_key),3) as prefix_chars
+from bronze.crm_cust_info cci 
+where cci.cst_key is not null 
+group by left(trim(cci.cst_key),3)
+
+select count(*), left(trim(cid),3) as prefix_chars
+from bronze.erp_cust_az12  
+where cid is not null 
+group by left(trim(cid),3)

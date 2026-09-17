@@ -76,6 +76,13 @@ Profiling identifies data-quality problems. It does not modify Bronze data.
 Transformation and standardization rules will be implemented in Silver.
 ===============================================================================
 */
+-- ============================================================================
+-- KEY FINDINGS FOR CID
+-- ============================================================================
+
+-- Candidate normalization:
+-- NASAW00011000 -> AW00011000
+-- AW00025441    -> AW00025441
 
 select * 
 from bronze.erp_cust_az12 
@@ -131,3 +138,55 @@ WHERE bdate IS NOT NULL
 select *
 from bronze.erp_cust_az12 eca 
 where bdate::date  > current_date
+
+
+---- Normalization and validation for CID-----
+
+---Main code for transformation------
+select cid, 
+    case 
+        when left(trim(cid),3) = 'NAS' then substring(trim(cid),4)
+        else trim(cid)
+    end as transformed_cid
+from bronze.erp_cust_az12
+---------------------------------------
+
+-----Validating --------------------
+---
+--Structural validation
+ --  ✓ row count
+ --  ✓ no NAS
+-- ✓ correct length
+ --  ✓ correct pattern
+ --  ✓ uniqueness
+
+---
+
+with erp_customer_cid_val as (
+    select  
+        case 
+            when left(trim(cid),3) = 'NAS' then substring(trim(cid),4)
+            else trim(cid)
+        end as transformed_cid
+    from bronze.erp_cust_az12
+)
+select count(*) as total_rows , 
+count(*) filter ( where transformed_cid like 'NAS%') as remianing_nas,
+count(*) filter ( where length(trim(transformed_cid)) != 10) as invalide_length,
+count(*) filter ( where transformed_cid !~ '^AW\d{8}$') as invalide_format
+from erp_customer_cid_val
+
+---------------Checking for duplicates-----------------------
+
+select count(*) , transformed_cid
+from (
+    select 
+        case 
+            when left(trim(cid),3) = 'NAS' then substring(trim(cid),4)
+            else trim(cid)
+        end as transformed_cid
+    from bronze.erp_cust_az12
+)
+group by transformed_cid
+having count(*) > 1
+
