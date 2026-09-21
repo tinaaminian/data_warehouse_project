@@ -475,3 +475,425 @@ Findings:
     - All 18,484 valid CRM customer keys match normalized ERP customer keys.
     - All normalized ERP customer keys have corresponding ERP location records.
     */
+
+    WITH ranked_customers AS (
+    SELECT
+        TRIM(cst_key) AS customer_key,
+        cst_firstname,
+        cst_lastname,
+        cst_marital_status,
+        case 
+        	when trim(cst_gndr) = 'M' then 'M'
+        	when trim(cst_gndr) = 'F' then 'F'
+        	else null 
+        end as crm_gender,
+        
+        cst_create_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY TRIM(cst_key)
+            ORDER BY cst_create_date DESC
+        ) AS row_num
+
+    FROM bronze.crm_cust_info
+),
+
+deduplicated_crm AS (
+    SELECT *
+    FROM ranked_customers
+    WHERE row_num = 1
+),
+
+valid_crm_customers AS (
+    SELECT *
+    FROM deduplicated_crm
+    WHERE customer_key ~ '^AW[0-9]{8}$'
+),
+
+erp_customers AS (
+    SELECT
+        CASE
+            WHEN LEFT(TRIM(cid), 3) = 'NAS'
+                THEN SUBSTRING(TRIM(cid), 4)
+            ELSE TRIM(cid)
+        END AS customer_key,
+        bdate,
+        case
+        	when trim(gen) in ('Male', 'M') then 'M'
+        	when trim(gen) in ('Female', 'F') then 'F'
+        	else null 
+        end as erp_gender
+        
+
+    FROM bronze.erp_cust_az12
+)
+select crm.*, erp.bdate, erp.gender
+FROM valid_crm_customers AS crm
+LEFT JOIN erp_customers AS erp
+    ON crm.customer_key = erp.customer_key
+
+---- checking for gender-----
+
+WITH ranked_customers AS (
+    SELECT
+        TRIM(cst_key) AS customer_key,
+        cst_firstname,
+        cst_lastname,
+        cst_marital_status,
+        case 
+        	when trim(cst_gndr) = 'M' then 'M'
+        	when trim(cst_gndr) = 'F' then 'F'
+        	else null 
+        end as crm_gender,
+        
+        cst_create_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY TRIM(cst_key)
+            ORDER BY cst_create_date DESC
+        ) AS row_num
+
+    FROM bronze.crm_cust_info
+),
+
+deduplicated_crm AS (
+    SELECT *
+    FROM ranked_customers
+    WHERE row_num = 1
+),
+
+valid_crm_customers AS (
+    SELECT *
+    FROM deduplicated_crm
+    WHERE customer_key ~ '^AW[0-9]{8}$'
+),
+
+erp_customers AS (
+    SELECT
+        CASE
+            WHEN LEFT(TRIM(cid), 3) = 'NAS'
+                THEN SUBSTRING(TRIM(cid), 4)
+            ELSE TRIM(cid)
+        END AS customer_key,
+        bdate,
+        case
+        	when trim(gen) in ('Male', 'M') then 'M'
+        	when trim(gen) in ('Female', 'F') then 'F'
+        	else null 
+        end as erp_gender
+        
+
+    FROM bronze.erp_cust_az12
+),
+customer_gender_comparison as (
+	select crm.*, erp.bdate, erp.erp_gender,
+	CASE
+	    WHEN crm.crm_gender IS NULL
+	         AND erp.erp_gender IS NULL
+	        THEN 'BOTH MISSING'
+	
+	    WHEN crm.crm_gender IS NULL
+	         AND erp.erp_gender IS NOT NULL
+	        THEN 'CRM MISSING'
+	
+	    WHEN crm.crm_gender IS NOT NULL
+	         AND erp.erp_gender IS NULL
+	        THEN 'ERP MISSING'
+	
+	    WHEN crm.crm_gender = erp.erp_gender
+	        THEN 'MATCH'
+	
+	    ELSE 'MISMATCH'
+	END AS gender_detection
+	
+	FROM valid_crm_customers AS crm
+	LEFT JOIN erp_customers AS erp
+	    ON crm.customer_key = erp.customer_key
+)
+select gender_detection , count(*)
+from customer_gender_comparison
+group by gender_detection
+
+
+-------------------------------
+WITH ranked_customers AS (
+    SELECT
+        TRIM(cst_key) AS customer_key,
+        cst_firstname,
+        cst_lastname,
+        cst_marital_status,
+        case 
+        	when trim(cst_gndr) = 'M' then 'M'
+        	when trim(cst_gndr) = 'F' then 'F'
+        	else null 
+        end as crm_gender,
+        
+        cst_create_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY TRIM(cst_key)
+            ORDER BY cst_create_date DESC
+        ) AS row_num
+
+    FROM bronze.crm_cust_info
+),
+
+deduplicated_crm AS (
+    SELECT *
+    FROM ranked_customers
+    WHERE row_num = 1
+),
+
+valid_crm_customers AS (
+    SELECT *
+    FROM deduplicated_crm
+    WHERE customer_key ~ '^AW[0-9]{8}$'
+),
+
+erp_customers AS (
+    SELECT
+        CASE
+            WHEN LEFT(TRIM(cid), 3) = 'NAS'
+                THEN SUBSTRING(TRIM(cid), 4)
+            ELSE TRIM(cid)
+        END AS customer_key,
+        bdate,
+        case
+        	when trim(gen) in ('Male', 'M') then 'M'
+        	when trim(gen) in ('Female', 'F') then 'F'
+        	else null 
+        end as erp_gender
+        
+
+    FROM bronze.erp_cust_az12
+),
+customer_gender_comparison as (
+	select crm.*, erp.bdate, erp.erp_gender,
+	CASE
+	    WHEN crm.crm_gender IS NULL
+	         AND erp.erp_gender IS NULL
+	        THEN 'BOTH MISSING'
+	
+	    WHEN crm.crm_gender IS NULL
+	         AND erp.erp_gender IS NOT NULL
+	        THEN 'CRM MISSING'
+	
+	    WHEN crm.crm_gender IS NOT NULL
+	         AND erp.erp_gender IS NULL
+	        THEN 'ERP MISSING'
+	
+	    WHEN crm.crm_gender = erp.erp_gender
+	        THEN 'MATCH'
+	
+	    ELSE 'MISMATCH'
+	END AS gender_detection
+	
+	FROM valid_crm_customers AS crm
+	LEFT JOIN erp_customers AS erp
+	    ON crm.customer_key = erp.customer_key
+)
+select crm_gender,erp_gender, count(*)
+from customer_gender_comparison
+where gender_detection = 'MISMATCH'
+group by crm_gender,erp_gender
+/*
+Gender reconciliation findings
+-------------------------------
+Total reconciled customers: 18,484
+
+MATCH:          12,397
+CRM MISSING:     4,554
+ERP MISSING:     1,461
+BOTH MISSING:       15
+MISMATCH:            57
+
+Mismatch breakdown:
+CRM F / ERP M: 40
+CRM M / ERP F: 17
+
+CRM and ERP can complement each other when one source is missing gender.
+However, 57 customers have conflicting non-null gender values.
+The profiling data does not establish which source is authoritative,
+so source precedence must be defined as part of the Silver transformation rule.
+*/
+
+WITH ranked_customers AS (
+    SELECT
+        TRIM(cst_key) AS customer_key,
+        cst_id,
+        cst_firstname,
+        cst_lastname,
+        cst_marital_status,
+        case 
+        	when trim(cst_gndr) = 'M' then 'M'
+        	when trim(cst_gndr) = 'F' then 'F'
+        	else null 
+        end as crm_gender,
+        
+        cst_create_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY TRIM(cst_key)
+            ORDER BY cst_create_date DESC
+        ) AS row_num
+
+    FROM bronze.crm_cust_info
+),
+deduplicated_crm AS (
+    SELECT *
+    FROM ranked_customers
+    WHERE row_num = 1
+),
+
+valid_crm_customers AS (
+    SELECT *
+    FROM deduplicated_crm
+    WHERE customer_key ~ '^AW[0-9]{8}$'
+)
+
+select count(*) as total_rows,
+count(*) filter (where trim(cst_id) = '') as blank_ids,
+count(*) filter (where cst_id is null) as null_ids,
+count(distinct cst_id) as distinct_ids,
+count(*) filter (where nullif(trim(cst_id) , '') is not null and trim(cst_id) !~ '^[0-9]+$') as non_numeric_ids
+from valid_crm_customers
+
+/*
+Findings:
+customer_id
+Source: CRM cst_id
+Silver transformation: TRIM(cst_id)::INTEGER
+Expected: NOT NULL + UNIQUE
+*/
+
+--- for names---
+/*
+NULLIF(TRIM(cst_firstname), '') AS first_name,
+NULLIF(TRIM(cst_lastname), '') AS last_name
+
+*/
+
+--inspecting first_name and last_name to establish rules for silver layer
+WITH ranked_customers AS (
+    SELECT
+        TRIM(cst_key) AS customer_key,
+        cst_id,
+        cst_firstname,
+        cst_lastname,
+        cst_marital_status,
+        case 
+        	when trim(cst_gndr) = 'M' then 'M'
+        	when trim(cst_gndr) = 'F' then 'F'
+        	else null 
+        end as crm_gender,
+        
+        cst_create_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY TRIM(cst_key)
+            ORDER BY cst_create_date DESC
+        ) AS row_num
+
+    FROM bronze.crm_cust_info
+),
+deduplicated_crm AS (
+    SELECT *
+    FROM ranked_customers
+    WHERE row_num = 1
+),
+
+valid_crm_customers AS (
+    SELECT *
+    FROM deduplicated_crm
+    WHERE customer_key ~ '^AW[0-9]{8}$'
+)
+
+select count(*) as total_rows,
+count(*) filter (where trim(cst_firstname) = '') as first_name_blank,
+count(*) filter (where trim(cst_firstname) is null) as first_name_nulls,
+count(*) filter (where cst_firstname <> trim(cst_firstname)) as first_name_whitespace,
+count(*) filter (where trim(cst_lastname) = '') as last_name_blank,
+count(*) filter (where trim(cst_lastname) is null) as last_name_nulls,
+count(*) filter (where cst_lastname <> trim(cst_lastname)) as last_name_whitespace
+from valid_crm_customers
+
+/* silver marital_status_rules
+CASE
+    WHEN cst_marital_status = 'M' THEN 'Married'
+    WHEN cst_marital_status = 'S' THEN 'Single'
+END AS marital_status
+*/
+
+/* bdate transformation rule:
+CASE
+    WHEN bdate::DATE <= CURRENT_DATE
+        THEN bdate::DATE
+    ELSE NULL
+END AS birth_date
+*/
+/*ERP birth-date finding
+----------------------
+Integrated customers: 18,484
+NULL:                     0
+Blank:                    0
+Invalid format:           0
+Future birth dates:      16
+
+All values are technically valid DATE values, but 16 are
+business-invalid because they occur after the processing date.
+
+Candidate Silver rule:
+- Valid/non-future date → cast to DATE
+- Future date → NULL
+
+*/
+WITH ranked_customers AS (
+    SELECT
+        TRIM(cst_key) AS customer_key,
+        cst_id,
+        cst_firstname,
+        cst_lastname,
+        cst_marital_status,
+        case 
+        	when trim(cst_gndr) = 'M' then 'M'
+        	when trim(cst_gndr) = 'F' then 'F'
+        	else null 
+        end as crm_gender,
+        
+        cst_create_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY TRIM(cst_key)
+            ORDER BY cst_create_date DESC
+        ) AS row_num
+
+    FROM bronze.crm_cust_info
+),
+deduplicated_crm AS (
+    SELECT *
+    FROM ranked_customers
+    WHERE row_num = 1
+),
+
+valid_crm_customers AS (
+    SELECT *
+    FROM deduplicated_crm
+    WHERE customer_key ~ '^AW[0-9]{8}$'
+),
+erp_loc AS (
+    select nullif(trim(cntry),'') as country, nullif(replace(trim(cid), '-',''),'') as customer_key
+    from bronze.erp_loc_a101
+)
+select  
+	CASE
+	    WHEN ep.country IN ('US', 'USA', 'United States')
+	        THEN 'United States'
+	
+	    WHEN ep.country IN ('DE', 'Germany')
+	        THEN 'Germany'
+
+    ELSE ep.country
+END AS country
+from valid_crm_customers as c
+inner join erp_loc as ep
+on c.customer_key = ep.customer_key
