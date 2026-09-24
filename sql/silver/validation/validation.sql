@@ -58,5 +58,5 @@ missing_customers_from_silver as (
 SELECT
     (SELECT COUNT(*) FROM valid_crm_customers) AS valid_crm_count,
     (SELECT COUNT(*) FROM integrated_customers) AS integrated_count,
-    (SELECT COUNT(*) FROM silver.customers) AS silver_count;
+    (SELECT COUNT(*) FROM silver.customers) AS silver_count,
     (SELECT COUNT(*) FROM missing_customers_from_silver) AS missing_from_silver_count
